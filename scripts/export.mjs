@@ -1,0 +1,16 @@
+import {readFileSync,writeFileSync,readdirSync,mkdirSync} from 'node:fs';
+import path from 'node:path';
+const root=path.resolve(import.meta.dirname,'..');
+const dist=path.join(root,'dist');
+const mime=file=>file.endsWith('.woff2')?'font/woff2':file.endsWith('.woff')?'font/woff':file.endsWith('.svg')?'image/svg+xml':'image/png';
+const dataUrl=file=>`data:${mime(file)};base64,${readFileSync(file).toString('base64')}`;
+let html=readFileSync(path.join(dist,'index.html'),'utf8');
+const iconMap=Object.fromEntries(readdirSync(path.join(dist,'icons')).filter(f=>f.endsWith('.svg')).map(f=>[f.slice(0,-4),dataUrl(path.join(dist,'icons',f))]));
+html=html.replace(/<link[^>]*href="([^"]+\.css)"[^>]*>/g,(_,url)=>{let css=readFileSync(path.join(dist,url.replace(/^\//,'')),'utf8');css=css.replace(/url\(([^)]+)\)/g,(all,raw)=>{const url=raw.replace(/["']/g,'');if(!url.startsWith('/assets/'))return all;return `url("${dataUrl(path.join(dist,url.slice(1)))}")`;});return `<style>${css}</style>`;});
+html=html.replace(/<script[^>]*src="([^"]+\.js)"[^>]*><\/script>/g,(_,url)=>{let js=readFileSync(path.join(dist,url.replace(/^\//,'')),'utf8');js=js.replace(/<\/script/gi,'<\\/script');return `<script>window.__ESTDELO_ICONS=${JSON.stringify(iconMap)};window.__ESTDELO_LOGO=${JSON.stringify(dataUrl(path.join(dist,'logo.png')))};</script><script type="module">${js}</script>`;});
+html=html.replace('</head>',`<!-- Inter font license\n${readFileSync(path.join(root,'node_modules/@fontsource/inter/LICENSE'),'utf8')} --></head>`);
+mkdirSync(path.join(root,'artifacts'),{recursive:true});
+writeFileSync(path.join(root,'artifacts','estdelo.html'),html);
+mkdirSync(path.join(root,'prototype'),{recursive:true});
+writeFileSync(path.join(root,'prototype','estdelo.html'),html);
+console.log('Standalone prototype: artifacts/estdelo.html and prototype/estdelo.html');
